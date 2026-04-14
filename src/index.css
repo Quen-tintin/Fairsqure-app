@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-background: #0A0E1A;
+  --color-card: #131929;
+  --color-card-border: #1E2D45;
+  --color-primary-accent: #00D4AA;
+  --color-secondary-accent: #0095FF;
+  --color-text-heading: #F0F4FF;
+  --color-text-label: #8899BB;
+  --color-text-body: #C4D0E8;
+  --color-positive: #00D4AA;
+  --color-negative: #FF4E64;
+  
+  --font-headline: "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-body font-body;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-text-heading font-headline font-bold;
+  }
+}
+
+@utility glass-panel {
+  @apply bg-card/60 backdrop-blur-xl border border-card-border;
+}
+
+@utility primary-gradient {
+  background: linear-gradient(135deg, #00D4AA, #0095FF);
+}
+
+@utility text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, #00D4AA, #0095FF);
+}
+
+@utility bento-card {
+  @apply bg-card border border-card-border rounded-2xl p-5 overflow-hidden relative;
+}
+
+@utility bento-title {
+  @apply text-[12px] uppercase text-text-label tracking-widest mb-4 font-semibold;
+}
+
+@utility input-field {
+  @apply w-full p-3 bg-background border border-card-border rounded-lg text-text-heading text-sm focus:ring-1 focus:ring-primary-accent outline-none transition-all;
+}
+
+@utility btn-predict {
+  @apply w-full p-3.5 primary-gradient border-none rounded-xl text-white font-bold mt-2 cursor-pointer hover:opacity-90 transition-all;
+}
+
+/* Leaflet dark theme adjustments */
+.leaflet-container {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
