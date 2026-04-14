@@ -46,3 +46,48 @@ export async function checkHealth() {
     return { status: 'offline' };
   }
 }
+
+export async function getModelMetrics() {
+  const response = await fetch(`${BASE_URL}/model/metrics`);
+  if (!response.ok) throw new Error('Failed to fetch model metrics');
+  return await response.json();
+}
+
+export async function getModelErrors() {
+  const response = await fetch(`${BASE_URL}/model/errors`);
+  if (!response.ok) throw new Error('Failed to fetch model errors');
+  return await response.json();
+}
+
+export async function getDvfTransactions(params: {
+  arrondissement?: number;
+  min_price?: number;
+  max_price?: number;
+  min_surface?: number;
+  max_surface?: number;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) query.set(k, String(v));
+  });
+  const response = await fetch(`${BASE_URL}/dvf/transactions?${query}`);
+  if (!response.ok) throw new Error('Failed to fetch DVF transactions');
+  return await response.json();
+}
+
+export async function getHiddenGems(params: {
+  min_gem_score?: number;
+  arrondissement?: number;
+  min_surface?: number;
+  max_price?: number;
+} = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) query.set(k, String(v));
+  });
+  const response = await fetch(`${BASE_URL}/hidden_gems?${query}`);
+  if (!response.ok) throw new Error('Failed to fetch hidden gems');
+  return await response.json();
+}
