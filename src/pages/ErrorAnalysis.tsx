@@ -33,9 +33,12 @@ export function ErrorAnalysis() {
   if (loading) {
     return (
       <Layout title="Error Analysis">
-        <div className="flex flex-col items-center justify-center h-96 gap-3">
-          <Loader2 className="animate-spin text-primary-accent" size={32} />
-          <p className="text-text-label text-sm">Computing residuals on test set...</p>
+        <div className="flex flex-col items-center justify-center h-96 gap-4">
+          <Loader2 className="animate-spin text-primary-accent" size={36} />
+          <p className="text-text-heading font-bold">Computing residuals on test set…</p>
+          <p className="text-text-label text-xs max-w-xs text-center">
+            Running predictions on 10,000+ transactions. First load takes ~20 seconds.
+          </p>
         </div>
       </Layout>
     );
@@ -44,8 +47,15 @@ export function ErrorAnalysis() {
   if (error || !data) {
     return (
       <Layout title="Error Analysis">
-        <div className="flex items-center justify-center h-96 text-negative">
-          Failed to load errors: {error}
+        <div className="flex flex-col items-center justify-center h-96 gap-3">
+          <p className="text-negative font-bold">Failed to load error analysis</p>
+          <p className="text-text-label text-xs max-w-md text-center break-all">{error}</p>
+          <button
+            onClick={() => { setError(''); setLoading(true); getModelErrors().then(setData).catch(e => setError(e.message)).finally(() => setLoading(false)); }}
+            className="mt-2 px-4 py-2 bg-card border border-card-border rounded-lg text-xs text-text-label hover:text-primary-accent transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </Layout>
     );
