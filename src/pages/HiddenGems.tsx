@@ -70,26 +70,46 @@ export function HiddenGems() {
               transition={{ delay: index * 0.08 }}
               className="bg-card rounded-xl overflow-hidden group hover:bg-card-border/20 transition-all duration-300 shadow-xl flex flex-col border border-card-border"
             >
-              {/* Header with gem score */}
-              <div className="relative p-5 pb-3 border-b border-card-border/30">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary-accent text-background px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter shadow-[0_0_12px_rgba(0,212,170,0.4)] flex items-center gap-1.5">
-                      <Diamond size={12} fill="currentColor" />
-                      {((gem.gem_score || 0) * 100).toFixed(1)}%
-                    </div>
-                    <span className="text-[10px] text-text-label font-bold">Paris {gem.arrondissement}e</span>
+              {/* Photo + gem score overlay */}
+              <div className="relative h-48 overflow-hidden">
+                {gem.photo_url ? (
+                  <img
+                    src={gem.photo_url}
+                    alt={gem.titre}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-card-border/30 flex items-center justify-center">
+                    <Diamond size={32} className="text-text-label/30" />
                   </div>
+                )}
+                <div className="absolute top-4 left-4 bg-primary-accent text-background px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter shadow-[0_0_12px_rgba(0,212,170,0.4)] flex items-center gap-1.5">
+                  <Diamond size={12} fill="currentColor" />
+                  GEM {((gem.gem_score || 0) * 100).toFixed(1)}%
+                </div>
+                <div className="absolute bottom-4 right-4 bg-card/80 backdrop-blur-md px-2 py-1 rounded text-primary-accent text-xs font-bold border border-card-border">
+                  +{formatPrice(gem.gain_potentiel)}
+                </div>
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <span className="bg-card/80 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-text-label border border-card-border">
+                    {gem.source}
+                  </span>
                   {gem.url && (
-                    <a href={gem.url} target="_blank" rel="noopener noreferrer" className="text-text-label hover:text-primary-accent transition-colors">
-                      <ExternalLink size={14} />
+                    <a href={gem.url} target="_blank" rel="noopener noreferrer" className="bg-card/80 backdrop-blur-md p-1.5 rounded border border-card-border text-text-label hover:text-primary-accent transition-colors">
+                      <ExternalLink size={12} />
                     </a>
                   )}
                 </div>
+              </div>
+
+              {/* Title */}
+              <div className="px-5 pt-4 pb-2">
                 <h4 className="font-headline font-bold text-text-heading text-sm group-hover:text-primary-accent transition-colors leading-snug">
                   {gem.titre}
                 </h4>
-                <p className="text-[11px] text-text-label mt-1">{gem.source}</p>
+                <p className="text-[10px] text-text-label mt-1 flex items-center gap-1">
+                  <MapPin size={10} /> Paris {gem.arrondissement}e
+                </p>
               </div>
 
               <div className="p-5 flex-1 flex flex-col">
