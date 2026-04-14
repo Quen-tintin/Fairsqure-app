@@ -42,6 +42,14 @@
 
 @utility bento-card {
   @apply bg-card border border-card-border rounded-2xl p-5 overflow-hidden relative;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+/* Bento card hover — subtle glow + lift */
+.bento-card:hover {
+  border-color: rgba(0, 212, 170, 0.25);
+  box-shadow: 0 0 20px rgba(0, 212, 170, 0.06), 0 8px 32px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
 }
 
 @utility bento-title {
@@ -53,10 +61,133 @@
 }
 
 @utility btn-predict {
-  @apply w-full p-3.5 primary-gradient border-none rounded-xl text-white font-bold mt-2 cursor-pointer hover:opacity-90 transition-all;
+  @apply w-full p-3.5 primary-gradient border-none rounded-xl text-white font-bold mt-2 cursor-pointer transition-all;
+  box-shadow: 0 4px 15px rgba(0, 212, 170, 0.25);
+}
+
+.btn-predict:hover {
+  box-shadow: 0 6px 25px rgba(0, 212, 170, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-predict:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(0, 212, 170, 0.2);
+}
+
+/* ── MotionSites-inspired visual polish ─────────────────────────── */
+
+/* Animated gradient mesh background */
+@utility hero-mesh {
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes mesh-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -20px) scale(1.05); }
+  50% { transform: translate(-20px, 30px) scale(0.95); }
+  75% { transform: translate(20px, 20px) scale(1.02); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+/* Ambient glow orbs — add to page backgrounds */
+@utility glow-orb-teal {
+  position: fixed;
+  top: -120px;
+  right: -80px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(0, 212, 170, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  animation: mesh-drift 15s ease-in-out infinite, glow-pulse 8s ease-in-out infinite;
+}
+
+@utility glow-orb-blue {
+  position: fixed;
+  bottom: -100px;
+  left: -60px;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(0, 149, 255, 0.10) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  animation: mesh-drift 20s ease-in-out infinite reverse, glow-pulse 10s ease-in-out infinite 2s;
+}
+
+/* Card hover glow effect */
+@utility card-glow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shimmer loading effect for cards */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@utility shimmer-loading {
+  background: linear-gradient(90deg, transparent 25%, rgba(0, 212, 170, 0.05) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Smooth page transitions */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Staggered children animation */
+@utility stagger-1 { animation-delay: 0.05s; }
+@utility stagger-2 { animation-delay: 0.1s; }
+@utility stagger-3 { animation-delay: 0.15s; }
+@utility stagger-4 { animation-delay: 0.2s; }
+@utility stagger-5 { animation-delay: 0.25s; }
+@utility stagger-6 { animation-delay: 0.3s; }
+
+/* Gradient border effect for premium cards */
+@utility gradient-border {
+  position: relative;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+
+/* Noise texture overlay for depth */
+@utility noise-overlay {
+  position: relative;
 }
 
 /* Leaflet dark theme adjustments */
 .leaflet-container {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0E1A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E2D45;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2A3D5A;
 }

@@ -53,8 +53,8 @@ export function Sidebar() {
       )}>
         <div className="flex flex-col h-full p-6 gap-8">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md primary-gradient"></div>
+          <div className="flex items-center gap-2 group cursor-default">
+            <div className="w-6 h-6 rounded-md primary-gradient shadow-[0_0_12px_rgba(0,212,170,0.3)] group-hover:shadow-[0_0_20px_rgba(0,212,170,0.5)] transition-shadow duration-300"></div>
             <h1 className="text-xl font-extrabold text-white tracking-tight">FairSquare</h1>
           </div>
 

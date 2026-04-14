@@ -24,12 +24,16 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex relative">
+      {/* Ambient glow orbs */}
+      <div className="glow-orb-teal"></div>
+      <div className="glow-orb-blue"></div>
+
       <Sidebar />
-      
-      <main className="flex-1 lg:ml-[220px] min-h-screen flex flex-col p-6 gap-5">
+
+      <main className="flex-1 lg:ml-[220px] min-h-screen flex flex-col p-6 gap-5 relative z-10">
         {/* Header */}
-        <header className="flex justify-between items-center">
+        <header className="flex justify-between items-center animate-fade-up">
           <h1 className="text-[22px] text-text-heading font-bold">{title}</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1 bg-card-border/30 rounded-full">
