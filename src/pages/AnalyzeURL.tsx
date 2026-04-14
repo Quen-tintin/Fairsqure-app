@@ -1,28 +1,79 @@
 import React, { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { MetricCard } from '../components/MetricCard';
-import { MOCK_URL_ANALYSIS } from '../data/constants';
+import { analyzeUrl } from '../services/api';
 import { formatPrice, cn } from '../lib/utils';
-import { Globe, Eye, Handshake, CheckCircle, FileText, Share2 } from 'lucide-react';
+import { Globe, Eye, Handshake, CheckCircle, FileText, Share2, AlertTriangle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+
+// Map vision fields to display values + bar percentages
+function renoLabel(score: number): { label: string; pct: number } {
+  const map: Record<number, { label: string; pct: number }> = {
+    1: { label: 'Neuf', pct: 95 },
+    2: { label: 'Bon état', pct: 78 },
+    3: { label: 'Standard', pct: 60 },
+    4: { label: 'Travaux légers', pct: 40 },
+    5: { label: 'Gros travaux', pct: 20 },
+  };
+  return map[score] || { label: 'N/A', pct: 50 };
+}
+
+function luminoBar(v: string): { label: string; pct: number } {
+  if (v === 'Lumineuse') return { label: 'Excellent', pct: 90 };
+  if (v === 'Sombre') return { label: 'Low', pct: 30 };
+  return { label: 'Average', pct: 60 };
+}
+
+function qualiteBar(v: string): { label: string; pct: number } {
+  if (v === 'Premium') return { label: 'Premium', pct: 92 };
+  if (v === 'Basique') return { label: 'Basic', pct: 35 };
+  return { label: 'Standard', pct: 65 };
+}
+
+function marginLabel(days: number | null, margin: number): string {
+  if (days === null) return `${(margin * 100).toFixed(0)}% — standard margin (listing age unknown)`;
+  if (days <= 30) return `${(margin * 100).toFixed(0)}% — fresh listing (${days}d), less room to negotiate`;
+  if (days <= 90) return `${(margin * 100).toFixed(0)}% — standard (${days}d on market)`;
+  if (days <= 180) return `${(margin * 100).toFixed(0)}% — stale listing (${days}d), seller likely motivated`;
+  return `${(margin * 100).toFixed(0)}% — very stale (${days}d), significant negotiation expected`;
+}
 
 export function AnalyzeURL() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!url) return;
     setLoading(true);
-    setTimeout(() => {
-      setResult(MOCK_URL_ANALYSIS);
+    setError(null);
+    setResult(null);
+    try {
+      const data = await analyzeUrl(url);
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Analysis failed. The listing may be unavailable or protected.');
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleAnalyze();
+  };
+
+  // Derived values from result
+  const vision = result?.vision || {};
+  const extras = result?.listing_extras || {};
+  const corrections = result?.corrections || {};
+  const reno = renoLabel(vision.renovation_score || 3);
+  const lumi = luminoBar(vision.luminosite || 'Moyenne');
+  const qual = qualiteBar(vision.qualite_generale || 'Standard');
+  const recommendedOffer = result ? Math.round(result.prix_annonce * (1 - (result.negotiation_margin || 0.07))) : 0;
+
   return (
-    <Layout 
-      title="Analyze URL" 
+    <Layout
+      title="Analyze URL"
       subtitle="Paste a real estate listing URL for deep AI extraction and analysis."
     >
       {/* URL Input */}
@@ -32,26 +83,48 @@ export function AnalyzeURL() {
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <Globe className="text-text-label" size={20} />
             </div>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="https://www.seloger.com/annonces/..."
               className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-text-heading focus:ring-0 font-body text-sm"
             />
           </div>
-          <button 
+          <button
             onClick={handleAnalyze}
             disabled={loading}
-            className="primary-gradient text-background font-headline font-bold px-10 rounded-lg text-sm hover:opacity-90 transition-all uppercase tracking-widest disabled:opacity-50"
+            className="primary-gradient text-background font-headline font-bold px-10 rounded-lg text-sm hover:opacity-90 transition-all uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
           >
-            {loading ? "Analyzing..." : "Analyze"}
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Analyzing...</> : "Analyze"}
           </button>
         </div>
       </section>
 
+      {/* Loading State */}
+      {loading && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 space-y-4">
+          <Loader2 size={40} className="animate-spin text-primary-accent mx-auto" />
+          <p className="text-text-label text-sm">Scraping listing... Analyzing photos with Gemini Vision...</p>
+          <p className="text-text-label/60 text-xs">This may take 15-30 seconds (scraping + AI vision on 5 photos)</p>
+        </motion.div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bento-card !border-red-500/30 flex items-start gap-4">
+          <AlertTriangle size={24} className="text-red-400 shrink-0 mt-1" />
+          <div>
+            <h4 className="font-headline font-bold text-text-heading mb-1">Analysis Failed</h4>
+            <p className="text-sm text-text-body">{error}</p>
+            <p className="text-xs text-text-label mt-2">Try a different URL, or check that the listing is still online.</p>
+          </div>
+        </motion.div>
+      )}
+
       {result && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-8"
@@ -59,27 +132,29 @@ export function AnalyzeURL() {
           {/* Hero Card */}
           <section className="grid grid-cols-12 gap-8">
             <div className="col-span-12 glass-panel rounded-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[320px]">
-              <div className="w-full md:w-2/5 relative h-64 md:h-full">
-                <img 
-                  src={result.photo_url} 
-                  alt="Listing" 
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-text-heading text-background px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter">
-                    {result.source} Verified
-                  </span>
+              {result.photo_url && (
+                <div className="w-full md:w-2/5 relative h-64 md:h-full">
+                  <img
+                    src={result.photo_url}
+                    alt="Listing"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-text-heading text-background px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter">
+                      {result.source} Verified
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex-1 p-8 flex flex-col justify-between">
                 <div>
                   <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                     <div>
                       <h3 className="text-2xl md:text-3xl font-headline font-extrabold tracking-tighter text-text-heading leading-tight">
-                        {result.titre}
+                        {result.titre || 'Listing Analysis'}
                       </h3>
                       <p className="text-text-label font-medium flex items-center gap-1 mt-1">
-                        <Globe size={14} /> Paris {result.arrondissement}ème — Folie-Méricourt
+                        <Globe size={14} /> Paris {result.arrondissement}ème
                       </p>
                     </div>
                     <div className="text-left md:text-right">
@@ -91,13 +166,13 @@ export function AnalyzeURL() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-3 mt-6">
                     {[
                       { label: 'Surface', value: `${result.surface}m²` },
                       { label: 'Rooms', value: result.pieces },
-                      { label: 'Bedrooms', value: result.pieces - 1 },
-                      { label: 'Floor', value: `${result.listing_extras.etage}th` },
+                      { label: 'Floor', value: extras.etage !== null && extras.etage !== undefined ? (extras.etage === 0 ? 'RDC' : `${extras.etage}th`) : 'N/A' },
+                      { label: 'Gem Score', value: `${(result.gem_score * 100).toFixed(1)}%` },
                     ].map((item) => (
                       <div key={item.label} className="px-4 py-2 bg-card-border/20 rounded-lg border border-card-border/50 flex flex-col items-center min-w-[80px]">
                         <span className="text-[10px] uppercase font-bold text-text-label tracking-widest">{item.label}</span>
@@ -109,22 +184,47 @@ export function AnalyzeURL() {
 
                 <div className="flex flex-wrap justify-between items-center gap-4 mt-6 md:mt-0">
                   <div className="flex flex-wrap gap-2">
-                    {result.listing_extras.features_found.slice(0, 3).map((f: string) => (
+                    {(extras.features_found || []).slice(0, 4).map((f: string) => (
                       <span key={f} className="px-3 py-1 bg-card-border/40 rounded-full text-[10px] font-medium uppercase tracking-wider text-text-body">
                         {f}
                       </span>
                     ))}
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold text-text-label uppercase tracking-widest">DPE CLASS</span>
-                    <span className="w-8 h-8 flex items-center justify-center bg-yellow-400 text-background font-black rounded">
-                      {result.listing_extras.dpe_classe || 'N/A'}
+                    <span className="text-xs font-bold text-text-label uppercase tracking-widest">DPE</span>
+                    <span className={cn(
+                      "w-8 h-8 flex items-center justify-center font-black rounded",
+                      extras.dpe_classe === 'A' || extras.dpe_classe === 'B' ? 'bg-green-400 text-background' :
+                      extras.dpe_classe === 'C' || extras.dpe_classe === 'D' ? 'bg-yellow-400 text-background' :
+                      extras.dpe_classe === 'E' ? 'bg-orange-400 text-background' :
+                      extras.dpe_classe === 'F' || extras.dpe_classe === 'G' ? 'bg-red-400 text-background' :
+                      'bg-card-border text-text-label'
+                    )}>
+                      {extras.dpe_classe || '—'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
           </section>
+
+          {/* Gem Score Banner */}
+          {result.is_hidden_gem && (
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              className="p-6 rounded-2xl border-2 border-primary-accent/40 bg-primary-accent/5 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-4">
+                <span className="text-4xl">💎</span>
+                <div>
+                  <h3 className="text-xl font-headline font-black text-primary-accent">Hidden Gem Detected</h3>
+                  <p className="text-sm text-text-body">This property is undervalued by {(result.gem_score * 100).toFixed(1)}% — potential gain of {formatPrice(result.gain_potentiel)}</p>
+                </div>
+              </div>
+              <span className="text-3xl font-headline font-black text-primary-accent">+{(result.gem_score * 100).toFixed(1)}%</span>
+            </motion.div>
+          )}
 
           {/* Analysis Grid */}
           <section className="grid grid-cols-12 gap-8 items-start">
@@ -134,22 +234,22 @@ export function AnalyzeURL() {
                 <h4 className="bento-title">Listing Details Analysis</h4>
                 <div className="space-y-4">
                   {[
-                    { label: 'Building Period', value: '1880-1914' },
-                    { label: 'Property Tax (TF)', value: '€ 1,240 / yr' },
-                    { label: 'Charges', value: '€ 320 / mo' },
-                    { label: 'Heating', value: 'Individual Gas' },
-                    { label: 'Last Renovation', value: '2012 (Delayed)', color: 'text-red-400' },
+                    { label: 'Days on Market', value: result.days_on_market !== null ? `${result.days_on_market} days` : 'Unknown' },
+                    { label: 'Exposition', value: extras.exposition || 'N/A' },
+                    { label: 'Charges', value: extras.charges_mensuelles ? `€ ${extras.charges_mensuelles} / mo` : 'N/A' },
+                    { label: 'DPE Class', value: extras.dpe_classe || 'Not detected' },
+                    { label: 'Photos Analyzed', value: vision.photos_analyzed ? `${vision.photos_analyzed} photos` : 'None' },
                   ].map((item) => (
                     <div key={item.label} className="flex justify-between items-center py-2 border-b border-card-border/30">
                       <span className="text-sm text-text-label">{item.label}</span>
-                      <span className={cn("text-sm font-bold", item.color || "text-text-heading")}>{item.value}</span>
+                      <span className="text-sm font-bold text-text-heading">{item.value}</span>
                     </div>
                   ))}
                 </div>
                 <div className="pt-4">
                   <p className="text-[10px] font-bold text-text-label uppercase tracking-widest mb-3">Extracted Tags</p>
                   <div className="flex flex-wrap gap-2">
-                    {result.listing_extras.features_found.map((tag: string) => (
+                    {(extras.features_found || []).map((tag: string) => (
                       <span key={tag} className="px-2 py-1 bg-card-border/20 rounded text-[10px] font-medium text-primary-accent">
                         {tag}
                       </span>
@@ -159,26 +259,27 @@ export function AnalyzeURL() {
               </div>
 
               <div className="bento-card">
-                <h4 className="bento-title mb-6">Price Benchmarks</h4>
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs text-text-label">Market Price Confidence</span>
-                      <span className="text-xs font-bold text-primary-accent">94.2%</span>
+                <h4 className="bento-title mb-6">Corrections Applied</h4>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Market Trend', value: `×${corrections.market_trend}`, desc: 'DVF data staleness adjustment' },
+                    { label: 'Floor', value: `×${corrections.floor_corr}`, desc: extras.etage !== null ? `Floor ${extras.etage}` : 'Unknown' },
+                    { label: 'DPE', value: `×${corrections.dpe_corr}`, desc: extras.dpe_classe ? `Class ${extras.dpe_classe}` : 'Not detected' },
+                    { label: 'Renovation', value: `×${corrections.reno_corr?.toFixed(3)}`, desc: `Vision score: ${vision.renovation_score || 'N/A'}` },
+                    { label: 'Exposition', value: `×${corrections.expo_corr}`, desc: extras.exposition || 'N/A' },
+                    { label: 'Reno Cost', value: corrections.reno_cost_m2 ? `-${corrections.reno_cost_m2}€/m²` : '—', desc: 'Estimated buyer renovation' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between py-1.5">
+                      <div>
+                        <span className="text-xs font-bold text-text-heading">{item.label}</span>
+                        <span className="text-[10px] text-text-label ml-2">{item.desc}</span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-primary-accent">{item.value}</span>
                     </div>
-                    <div className="h-1 bg-card-border/30 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary-accent w-[94%]"></div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-background rounded-xl">
-                      <span className="text-[10px] text-text-label uppercase font-bold tracking-widest block mb-1">Low Range</span>
-                      <span className="text-lg font-headline font-bold text-text-heading">€ 1.02M</span>
-                    </div>
-                    <div className="p-4 bg-background rounded-xl">
-                      <span className="text-[10px] text-text-label uppercase font-bold tracking-widest block mb-1">High Range</span>
-                      <span className="text-lg font-headline font-bold text-text-heading">€ 1.21M</span>
-                    </div>
+                  ))}
+                  <div className="pt-3 border-t border-card-border/50 flex justify-between">
+                    <span className="text-sm font-bold text-text-heading">Total Correction</span>
+                    <span className="text-sm font-mono font-black text-primary-accent">×{corrections.total_corr}</span>
                   </div>
                 </div>
               </div>
@@ -186,6 +287,48 @@ export function AnalyzeURL() {
 
             {/* Right Column */}
             <div className="col-span-12 lg:col-span-8 space-y-8">
+              {/* Price Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bento-card text-center">
+                  <span className="text-[10px] uppercase font-bold text-text-label tracking-widest block mb-2">AI Predicted</span>
+                  <span className="text-2xl font-headline font-black text-primary-accent">{formatPrice(result.prix_predit_m2)}/m²</span>
+                  <span className="text-sm text-text-label block mt-1">{formatPrice(result.prix_predit_total)} total</span>
+                </div>
+                <div className="bento-card text-center">
+                  <span className="text-[10px] uppercase font-bold text-text-label tracking-widest block mb-2">Asking Price</span>
+                  <span className="text-2xl font-headline font-black text-text-heading">{formatPrice(result.prix_affiche_m2)}/m²</span>
+                  <span className="text-sm text-text-label block mt-1">{formatPrice(result.prix_annonce)} total</span>
+                </div>
+                <div className="bento-card text-center">
+                  <span className="text-[10px] uppercase font-bold text-text-label tracking-widest block mb-2">LightGBM Raw</span>
+                  <span className="text-2xl font-headline font-black text-text-body">{formatPrice(result.prix_predit_m2_brut)}/m²</span>
+                  <span className="text-sm text-text-label block mt-1">Before corrections</span>
+                </div>
+              </div>
+
+              {/* SHAP Explainability */}
+              {result.shap_top3?.length > 0 && (
+                <div className="bento-card">
+                  <h4 className="bento-title mb-4">SHAP Explainability — Why This Price?</h4>
+                  <div className="space-y-3">
+                    {result.shap_top3.map((s: any) => (
+                      <div key={s.feature} className="flex items-center gap-4">
+                        <span className="text-xs text-text-label w-40 shrink-0 truncate">{s.feature}</span>
+                        <div className="flex-1 h-6 bg-card-border/20 rounded-full overflow-hidden relative">
+                          <div
+                            className={cn("h-full rounded-full", s.impact >= 0 ? "bg-primary-accent" : "bg-red-400")}
+                            style={{ width: `${Math.min(Math.abs(s.impact) / 5, 100)}%`, marginLeft: s.impact < 0 ? 'auto' : 0 }}
+                          />
+                        </div>
+                        <span className={cn("text-xs font-mono font-bold w-24 text-right", s.impact >= 0 ? "text-primary-accent" : "text-red-400")}>
+                          {s.impact >= 0 ? '+' : ''}{s.impact} €/m²
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Vision Intelligence */}
               <div className="bento-card !p-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-5">
@@ -197,29 +340,36 @@ export function AnalyzeURL() {
                       <Eye size={20} />
                     </div>
                     <h4 className="text-xl font-headline font-bold tracking-tight text-text-heading">Gemini Vision Intelligence</h4>
+                    {vision.photos_analyzed && (
+                      <span className="px-2 py-0.5 bg-secondary-accent/20 rounded text-[10px] font-bold text-secondary-accent">
+                        {vision.photos_analyzed} photos analyzed
+                      </span>
+                    )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                     {[
-                      { label: 'Renovation', value: 'High-End', score: 85 },
-                      { label: 'Luminosity', value: 'Excellent', score: 92 },
-                      { label: 'Layout', value: 'Optimized', score: 78 },
+                      { label: 'Renovation', ...reno },
+                      { label: 'Luminosity', ...lumi },
+                      { label: 'Quality', ...qual },
                     ].map((item) => (
                       <div key={item.label} className="space-y-3">
                         <div className="flex justify-between items-end">
                           <span className="text-xs font-bold uppercase tracking-widest text-text-label">{item.label}</span>
-                          <span className="text-sm font-black text-secondary-accent">{item.value}</span>
+                          <span className="text-sm font-black text-secondary-accent">{item.label}</span>
                         </div>
                         <div className="h-1.5 bg-card-border/30 rounded-full overflow-hidden flex">
-                          <div className="h-full bg-secondary-accent" style={{ width: `${item.score}%` }}></div>
+                          <div className="h-full bg-secondary-accent" style={{ width: `${item.pct}%` }}></div>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="p-6 bg-card-border/20 rounded-xl italic text-text-body/80 text-sm leading-relaxed border-l-4 border-secondary-accent/30">
-                    "{result.vision.reasoning}"
-                  </div>
+                  {vision.reasoning && (
+                    <div className="p-6 bg-card-border/20 rounded-xl italic text-text-body/80 text-sm leading-relaxed border-l-4 border-secondary-accent/30">
+                      "{vision.reasoning}"
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -234,55 +384,85 @@ export function AnalyzeURL() {
                   </div>
                   <div className="px-4 py-2 bg-background rounded-lg text-left md:text-right w-full md:w-auto">
                     <span className="text-[10px] text-text-label uppercase font-bold tracking-widest block">Recommended Offer</span>
-                    <span className="text-lg font-headline font-bold text-primary-accent">€ 1,087,750</span>
+                    <span className="text-lg font-headline font-bold text-primary-accent">{formatPrice(recommendedOffer)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-10">
-                  <div className="relative pt-6">
+                  <div className="relative pt-2">
                     <div className="flex justify-between mb-4">
-                      <span className="text-sm font-bold text-text-heading">Aggressiveness Margin</span>
-                      <span className="text-sm font-black text-primary-accent">5%</span>
+                      <span className="text-sm font-bold text-text-heading">Dynamic Margin</span>
+                      <span className="text-sm font-black text-primary-accent">{((result.negotiation_margin || 0.07) * 100).toFixed(0)}%</span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="15" 
-                      defaultValue="5"
-                      className="w-full h-2 bg-card-border/30 rounded-lg appearance-none cursor-pointer accent-primary-accent"
-                    />
+                    <div className="h-3 bg-card-border/30 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full bg-primary-accent rounded-full transition-all"
+                        style={{ width: `${((result.negotiation_margin || 0.07) / 0.15) * 100}%` }}
+                      />
+                      {/* Scale markers */}
+                      {[5, 7, 10, 13].map((v) => (
+                        <div
+                          key={v}
+                          className="absolute top-0 h-full w-px bg-text-label/30"
+                          style={{ left: `${(v / 15) * 100}%` }}
+                        />
+                      ))}
+                    </div>
                     <div className="flex justify-between mt-2 text-[10px] text-text-label font-bold uppercase">
-                      <span>Safe (0%)</span>
-                      <span>Moderate (7.5%)</span>
-                      <span>Aggressive (15%)</span>
+                      <span>Fresh (5%)</span>
+                      <span>Standard (7%)</span>
+                      <span>Stale (10%)</span>
+                      <span>Old (13%)</span>
                     </div>
+                    <p className="text-xs text-text-body mt-3">
+                      {marginLabel(result.days_on_market, result.negotiation_margin || 0.07)}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                      <h5 className="text-xs font-bold uppercase tracking-widest text-text-label">Negotiation Levers</h5>
+                      <h5 className="text-xs font-bold uppercase tracking-widest text-text-label">Negotiation Context</h5>
                       <ul className="space-y-3">
+                        {corrections.dpe_corr && corrections.dpe_corr < 1 && (
+                          <li className="flex items-start gap-3 text-sm">
+                            <CheckCircle size={16} className="text-primary-accent mt-0.5" />
+                            <span className="text-text-body">Poor DPE ({extras.dpe_classe}) — energy renovation costs can justify a lower offer.</span>
+                          </li>
+                        )}
+                        {corrections.reno_cost_m2 > 0 && (
+                          <li className="flex items-start gap-3 text-sm">
+                            <CheckCircle size={16} className="text-primary-accent mt-0.5" />
+                            <span className="text-text-body">Estimated renovation cost: {corrections.reno_cost_m2} €/m² ({formatPrice(corrections.reno_cost_m2 * result.surface)} total).</span>
+                          </li>
+                        )}
                         <li className="flex items-start gap-3 text-sm">
                           <CheckCircle size={16} className="text-primary-accent mt-0.5" />
-                          <span className="text-text-body">DPE 'C' is good but requires isolation upgrades for 'B' target.</span>
-                        </li>
-                        <li className="flex items-start gap-3 text-sm">
-                          <CheckCircle size={16} className="text-primary-accent mt-0.5" />
-                          <span className="text-text-body">Market average in Folie-Méricourt is trending -1.2% this quarter.</span>
+                          <span className="text-text-body">
+                            LightGBM predicts {formatPrice(result.prix_predit_m2_brut)}/m² raw, vs asking {formatPrice(result.prix_affiche_m2)}/m² —
+                            {result.prix_predit_m2_brut > result.prix_affiche_m2 ? ' property is below market' : ' property is above market prediction'}.
+                          </span>
                         </li>
                       </ul>
                     </div>
                     <div className="space-y-4">
-                      <h5 className="text-xs font-bold uppercase tracking-widest text-text-label">Success Probability</h5>
-                      <div className="flex items-center gap-6">
-                        <div className="relative w-20 h-20">
-                          <svg className="w-full h-full" viewBox="0 0 36 36">
-                            <path className="text-card-border/30" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                            <path className="text-primary-accent" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="68, 100" strokeLinecap="round" strokeWidth="3" />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center font-headline font-black text-lg text-text-heading">68%</div>
+                      <h5 className="text-xs font-bold uppercase tracking-widest text-text-label">Key Metrics</h5>
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-card-border/20">
+                          <span className="text-xs text-text-label">Asking price</span>
+                          <span className="text-xs font-bold text-text-heading">{formatPrice(result.prix_annonce)}</span>
                         </div>
-                        <p className="text-xs text-text-label leading-tight">High probability of acceptance based on similar sold assets in the building.</p>
+                        <div className="flex justify-between py-2 border-b border-card-border/20">
+                          <span className="text-xs text-text-label">After negotiation ({((result.negotiation_margin || 0.07) * 100).toFixed(0)}%)</span>
+                          <span className="text-xs font-bold text-text-heading">{formatPrice(recommendedOffer)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-card-border/20">
+                          <span className="text-xs text-text-label">AI predicted value</span>
+                          <span className="text-xs font-bold text-primary-accent">{formatPrice(result.prix_predit_total)}</span>
+                        </div>
+                        <div className="flex justify-between py-2">
+                          <span className="text-xs text-text-label">Potential gain</span>
+                          <span className="text-xs font-bold text-primary-accent">+{formatPrice(result.gain_potentiel)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -290,19 +470,6 @@ export function AnalyzeURL() {
               </div>
             </div>
           </section>
-
-          {/* Floating Actions */}
-          <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-30">
-            <button className="w-14 h-14 glass-panel rounded-full flex items-center justify-center text-text-heading shadow-2xl hover:bg-card-border/50 transition-all">
-              <Share2 size={20} />
-            </button>
-            <button className="primary-gradient p-[1px] rounded-full shadow-2xl hover:scale-105 transition-all">
-              <div className="bg-background rounded-full px-6 py-3 flex items-center gap-3">
-                <span className="text-xs font-bold uppercase tracking-widest text-primary-accent">Generate PDF Report</span>
-                <FileText size={18} className="text-primary-accent" />
-              </div>
-            </button>
-          </div>
         </motion.div>
       )}
     </Layout>
